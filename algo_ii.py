@@ -81,11 +81,11 @@ def predict_citations( candidates, authorities ):
     keywords = []
     for candidate in candidates:
         # TODO: We should probably drop keywords that contain ':'
-	colon = candidate.rfind(':')
-	keyword = candidate[:colon]
-	# NOTE: Some keywords don't have a score, e.g. ID 747316's "durp" keyw
-	try:
-	    relevance = float( candidate[colon+1:] )
+        colon = candidate.rfind(':')
+        keyword = candidate[:colon]
+        # NOTE: Some keywords don't have a score, e.g. ID 747316's "durp" keyw
+        try:
+            relevance = float( candidate[colon+1:] )
         except ValueError:
             break
         # Ignore doc_ids less than threshold

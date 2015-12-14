@@ -92,6 +92,7 @@ def get_references( index ):
     refs = list( map(int, refs) )
     return refs
 
+"""
 def get_recommendations( index ):
     # TODO: Update this with infer_vector stuff
     #       and better logic in general.
@@ -106,7 +107,7 @@ def get_recommendations( index ):
         #print( sim_ids[i], cossims[sim_ids[i]] )
     doc_ids = [ tag_map[i] for i in sim_ids ]
     return doc_ids
-
+"""
 
 def _full_d2v_test():
     # NOTE: For this to work, we need to train a model

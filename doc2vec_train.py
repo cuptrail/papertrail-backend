@@ -116,7 +116,6 @@ def train_and_save_doc2vec( docs, epochs=1, dm=1, dm_concat=1, size=400, window=
 
 if __name__ == '__main__':
     docs = get_docs()
-    train_and_save_doc2vec( docs )
     # TODO: Try setting different epochs for these models, amongst other changes
 
     # External test configurations:
@@ -125,7 +124,8 @@ if __name__ == '__main__':
     # PV-DBOW 
     train_and_save_doc2vec( docs, dm=0, size=400, negative=5, hs=0, min_count=2 )
     # PV-DM w/average
-    train_and_save_doc2vec( docs, dm=1, dm_mean=1, size=400, window=10, negative=5, hs=0, min_count=2 )
+    # NOTE: This doesn't work?? because, evidently, 'dm_mean' is not an expected parameter?
+    #train_and_save_doc2vec( docs, dm=1, dm_mean=1, size=400, window=10, negative=5, hs=0, min_count=2 )
     
     # Our test configurations:
     train_and_save_doc2vec( docs, size=200 )

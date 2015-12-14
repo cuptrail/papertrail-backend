@@ -4,7 +4,7 @@ from algo_ii import predict_citations as iks_get_recs  # for "inverted keyword-s
 import socket
 
 HOST = ''
-PORT = 6969
+PORT = 63696  # 6969 or 63696 for laptop, 63969 for desktop
 
 DOC2VEC_MODEL_FILE = 'file'   # TODO: Set filepath
 
@@ -42,8 +42,8 @@ def serve():
         data = clientsocket.recv(1024).decode()  # TODO: Update buffer value
         print( 'Received: '+ data )
 
-        #abstract, keywords_scores = parse_input( data )
-        response = compute_recommendations( *parse_input(data) )
+        #response = compute_recommendations( *parse_input(data) )  # TODO: Enable this
+        response = 'DUMMY RESPONSE'
 
         print( 'Sending: '+ response )
         clientsocket.send( response.encode() )
@@ -53,9 +53,17 @@ def serve():
 def parse_input( string ):
     """ Given a string (sent via socket), extract the abstract and keywords+scores.
     """
-    # TODO: Finish this
-    abstract = ''
+    # TODO: Finish this. This is probably very temporary code.
+    args = string.split('||')
+    abstract = args[0]
+
     keywords_scores = {}
+    keys_scores = args[1].split(';')
+    for k_s in keys_scores:
+        args = k_s.split(':')
+        keywords_scores[ args[0] ] = float( args[1] )
+    print( '- abstract = '+ abstract )
+    print( '- keywords_scores = '+ str(keywords_scores) )
     return abstract, keywords_scores
 
 def compute_recommendations( abstract, keywords_scores ):
@@ -73,6 +81,6 @@ def compute_recommendations( abstract, keywords_scores ):
     #       Trivial solution: weights doc_ids higher that are obtained from both D2V and IKS
 
 if __name__ == '__main__':
-    initialize_models()
+    #initialize_models()
 
     serve()
