@@ -66,7 +66,7 @@ def transform_DBLP_data():
     """ Really only used for testing Bluemix... to save space
     """
     papers = pd.read_csv( 'data-kw.csv' )
-    with open( '../../DBLP_ids_abstracts.txt', 'w' ) as f:
+    with open( 'DBLP_ids_abstracts.txt', 'w' ) as f:
         for i, abstract in enumerate( papers['ABSTRACT'] ):
             index = papers['INDEX'][i]
             f.write( str(index) + '|' + str(abstract) + '\n' )

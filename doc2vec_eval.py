@@ -1,18 +1,13 @@
-# TODO: See what imports are NOT needed here
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 #from nltk.tokenize import MWETokenizer
-import pandas as pd
-import re
-import sqlite3
 
 # TODO: When checking user's input, (if necessary) see if the keywords are present in the model vocab or not
 
 from doc2vec_train import clean_tokenize
 
+# To be used? See doc2vec_train.py for how they're created/used
 #tag_map
-arXiv_start
-
-model2 = Doc2Vec.load( 'doc2vecmodel_s400w8mc2' )
+#arXiv_start
 
 from numpy import dot, sqrt, argmax
 

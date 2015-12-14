@@ -76,6 +76,8 @@ def get_scores(keywords, authorities):
 
 
 def predict_citations( candidates, authorities ):
+    # TODO: Do we make sure all keywords are lower-cased and trimmed and such ??
+
     keywords = []
     for candidate in candidates:
         # TODO: We should probably drop keywords that contain ':'
@@ -95,4 +97,4 @@ def predict_citations( candidates, authorities ):
     return scores
 
 if __name__ == '__main__':
-    predict_citations('134807')
+    pass
