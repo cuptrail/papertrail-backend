@@ -1,12 +1,10 @@
-# TODO: Check installation of:
-#       cython
-#       gensim
+# TODO: Test python3 vs. python2 unicode ! Hopefully trained models aren't affected......................
 
-#from datetime.datetime import now
 import datetime
 #from random import shuffle
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 #from nltk.tokenize import MWETokenizer
+from random import shuffle
 from multiprocessing import cpu_count
 cores = cpu_count()
 
@@ -43,7 +41,9 @@ def get_abstracts_indices_from_DBLP():
         ab_words = clean_tokenize( abstract )
         if not USE_DBLP_IDS:
             tag_map.append( index )
-        yield TaggedDocument( words=ab_words, tags=[int(index)] )  # NOTE: WAS tags=[i]
+            yield TaggedDocument( words=ab_words, tags=[i] )
+        else:
+            yield TaggedDocument( words=ab_words, tags=[int(index)] )  # TODO: Or try 'DBLP_'+str(index) ?
         # NOTE: Consider having the list of references as multiple tags/labels?
         
 def get_abstracts_indices_from_arXiv():
@@ -58,7 +58,9 @@ def get_abstracts_indices_from_arXiv():
         ab_words = clean_tokenize( abstract )
         if not USE_DBLP_IDS:
             tag_map.append( index )
-        yield TaggedDocument( words=ab_words, tags=[int(index)])  # NOTE: WAS tags=[arXiv_start + i]
+            yield TaggedDocument( words=ab_words, tags=[arXiv_start + i] )
+        else: 
+            yield TaggedDocument( words=ab_words, tags=[int(index)])  # TODO: Or try 'ARXIV_'+str(index) ?
     conn.close()
 
 
@@ -88,7 +90,7 @@ def get_paper_abstract( idx ):
     return ' '.join( docs[idx].words )
 
 
-def train_and_save_doc2vec( docs, epochs=1, dm=1, dm_concat=1, size=400, window=5, negative=5, hs=0, min_count=2 ):
+def train_and_save_doc2vec( docs, epochs=12, dm=1, dm_concat=1, size=400, window=5, negative=5, hs=0, min_count=2 ):
     alpha, min_alpha = (0.025, 0.001)
     alpha_delta = (alpha - min_alpha) / epochs
 
@@ -99,15 +101,26 @@ def train_and_save_doc2vec( docs, epochs=1, dm=1, dm_concat=1, size=400, window=
     model.build_vocab( docs ) # TODO: Is this necessary?
     print( 'Done building vocab at {}.'.format( now() ) )
     for epoch in range( epochs ):
-        print( 'Epoch 1 at {}'.format( now() ) )
+        # Shuffle docs for better results, gensim folks say
+        shuffle( docs )
+
+        print( 'Epoch #{} at {}'.format( epoch, now() ) )
         # TODO: Look into Doc2Vec.reset_from() and maybe use model[i].reset_from( model )
         #       (if we're training multiple different models in bulk)
+
+        model.alpha, model.min_alpha = alpha, alpha   # Freeze learning rate
         model.train( docs )
-        print( 'Done training at {}'.format( now() ) )
-        # TODO: Finish this. e.g. set and use alpha values, ...
+
+        alpha -= alpha_delta
+        print( 'Done training #{} at {}'.format( epoch, now() ) )
 
     #return model
-    filepath = 'epochs{}dm{}dm_concat{}size{}window{}negative{}hs{}min_count{}'.format( epochs,
+    filepath = ''
+    if USE_DBLP_IDS:
+        filepath = 'tagmap0'
+    else:
+        filepath = 'tagmap1'
+    filepath += 'epochs{}dm{}dmc{}size{}win{}neg{}hs{}minc{}'.format( epochs,
         dm, dm_concat, size, window, negative, hs, min_count )
     print( 'Saving model to {}'.format( filepath ) )
     model.save( filepath )
@@ -115,19 +128,23 @@ def train_and_save_doc2vec( docs, epochs=1, dm=1, dm_concat=1, size=400, window=
 
 
 if __name__ == '__main__':
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == 'USE_DBLP_IDS':
+        USE_DBLP_IDS = True
+
     docs = get_docs()
     # TODO: Try setting different epochs for these models, amongst other changes
 
     # External test configurations:
     # PV-DM w/concatenation - window=5 (both sides) approximates paper's 10-word total window size
-    train_and_save_doc2vec( docs, dm=1, dm_concat=1, size=400, window=5, negative=5, hs=0, min_count=2 )
+    #train_and_save_doc2vec( docs, dm=1, dm_concat=1, size=400, window=5, negative=5, hs=0, min_count=2 )
     # PV-DBOW 
-    train_and_save_doc2vec( docs, dm=0, size=400, negative=5, hs=0, min_count=2 )
+    #train_and_save_doc2vec( docs, dm=0, size=400, negative=5, hs=0, min_count=2 )
     # PV-DM w/average
     # NOTE: This doesn't work?? because, evidently, 'dm_mean' is not an expected parameter?
     #train_and_save_doc2vec( docs, dm=1, dm_mean=1, size=400, window=10, negative=5, hs=0, min_count=2 )
     
     # Our test configurations:
-    train_and_save_doc2vec( docs, size=200 )
-    train_and_save_doc2vec( docs, size=300 )
+    #train_and_save_doc2vec( docs, size=200 )
+    #train_and_save_doc2vec( docs, size=300 )
     train_and_save_doc2vec( docs, size=400 )
