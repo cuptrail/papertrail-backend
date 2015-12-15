@@ -7,7 +7,7 @@ import time
 HOST = ''
 PORT = 6969  # 63696 for laptop; 6969, 36969, or 63969 for desktop
 
-DOC2VEC_MODEL_FILE = 'file'   # TODO: Set filepath
+DOC2VEC_MODEL_FILE = 'epochs1dm0dm_concat1size400window5negative5hs0min_count2'   # TODO: Set filepath
 
 # "Cached" 
 d2v_model = None
@@ -24,7 +24,7 @@ def initialize_models():
     import csv
     csv.field_size_limit( 2**30 )  # NOTE: was sys.maxsize. Failed on my system, for some reason
     with open( 'authorities_scores.csv', 'r' ) as auth_file:
-        reader = csv.reader( data, delimiter=',', quotchar='\"' )
+        reader = csv.reader( auth_file, delimiter=',', quotechar='\"' )
         for row in reader:
             authorities[ row[0] ] = float( row[1] )
 
@@ -64,7 +64,7 @@ def serve():
             date = ''
             try:
                 # TODO: Use recv_timeout() instead ?
-                data = clientsocket.recv(1024)  # TODO: Update buffer value  # NOTE: Use .decode() if python3
+                data = clientsocket.recv(8192)  # TODO: Update buffer value  # NOTE: Use .decode() if python3
             except:
                 break
             if data == '':
@@ -72,8 +72,8 @@ def serve():
 
             print( 'Received: '+ data )
             abstract, keys_scores = parse_input(data)
-            #response = compute_recommendations( abstract, keys_scores )  # TODO: Enable this
-            response = 'You sent: abstract = '+ abstract +'; keys_scores = '+ str(keys_scores)
+            response = 'echo_abstract='+ abstract +';echo_keys_scores='+ str(keys_scores)
+            response += ';recs='+ str( compute_recommendations( abstract, keys_scores ) )
 
             print( 'Sending: '+ response )
             try:
@@ -91,14 +91,19 @@ def parse_input( string ):
     """ Given a string (sent via socket), extract the abstract and keywords+scores.
     """
     # TODO: Finish this. This is probably very temporary code.
-    args = string.split('||')
-    abstract = args[0]
-
+    abstract = ''
     keywords_scores = {}
-    keys_scores = args[1].split(';')
-    for k_s in keys_scores:
-        args = k_s.split(':')
-        keywords_scores[ args[0] ] = float( args[1] )
+    try:
+        args = string.split('||')
+        abstract = args[0]
+
+        keywords_scores = {}
+        keys_scores = args[1].split(';')
+        for k_s in keys_scores:
+            args = k_s.split(':')
+            keywords_scores[ args[0] ] = float( args[1] )
+    except:
+        pass
     print( '- abstract = '+ abstract )
     print( '- keywords_scores = '+ str(keywords_scores) )
     return abstract, keywords_scores
@@ -107,17 +112,18 @@ def compute_recommendations( abstract, keywords_scores ):
     """ Given an abstract and keywords+scores,
         output reference recommendations as a string of comma-separated IDs (ints).
     """
-    #d2v_rec_doc_ids = doc2vec_eval.get_recommendations( d2v_model, abstract )
-    d2v_rec_doc_ids = d2v_get_recs( d2v_model, abstract )
+	#d2v_rec_doc_ids = d2v_get_recs( d2v_model, abstract )  # TODO: Enable this
 
     # TODO: The following function currently expects keywords+scores in a different format
     #       so either change this call or change the function.
     iks_rec_doc_ids = iks_get_recs( keywords_scores, authorities )
 
+    return iks_rec_doc_ids  # TODO: Replace this with permanent solution
+
     # TODO: Finish this. Decide how we want to have an integrated solution
     #       Trivial solution: weights doc_ids higher that are obtained from both D2V and IKS
 
 if __name__ == '__main__':
-    #initialize_models()   # TODO: Enable this
+    initialize_models()
 
     serve()
