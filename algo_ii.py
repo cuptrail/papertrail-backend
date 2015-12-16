@@ -61,11 +61,11 @@ def get_scores( keywords_docsrels, keywords ):
             for entry in docsrels:
                 doc = entry[0]
                 score = entry[1]
-                if doc not in docs:
-                    docs[doc] = score
+                if doc not in docs:             # TODO: Test different values
+                    docs[doc] = (score * 0.2)
                 else:
-                    docs[doc] += score
-	"""
+                    docs[doc] += (score * 0.2)
+    """
     # Add authority score to doc entries, remove docs with 0 authority
     for doc in docs.keys():
         try:
@@ -74,8 +74,9 @@ def get_scores( keywords_docsrels, keywords ):
         except KeyError:
             del docs[doc]
 	"""
-    # Sort and return top 20
-    return sorted( docs.iteritems(), key=lambda x:-x[1] )[:20]
+    # Sort and return top X
+    #return sorted( docs.iteritems(), key=lambda x:-x[1] )[:7]  # NOTE: iteritems() is for Python 2!!
+    return sorted( docs.items(), key=lambda x:-x[1] )[:7]
 
 
 def predict_citations( keywords_docsrels, candidates ):

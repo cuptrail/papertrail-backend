@@ -1,6 +1,9 @@
 # TODO: Test python3 vs. python2 unicode ! Hopefully trained models aren't affected......................
 
-from doc2vec_eval import get_recommendations
+from doc2vec_eval import get_recommendations as d2ve_get_recommendations
+from server import compute_recommendations as serv_get_recommendations
+from server import initialize_authorities
+from algo_ii import populate_iks_dict
 import datetime
 #from random import shuffle
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
@@ -86,7 +89,7 @@ def get_paper_abstract( idx ):
     return ' '.join( docs[idx].words )
 
 
-def test_model( model, test_papers ):
+def test_model( FULL_SIM, model, test_papers, keywords_docsrels, authorities ):
     hits = 0
     misses = 0
 
@@ -95,10 +98,19 @@ def test_model( model, test_papers ):
     lowest_hit = 1
     hit_total = 0
     for i, abstract in enumerate( test_papers['ABSTRACT'] ):
+        if i == 200:
+            break
         index = test_papers['INDEX'][i]
 
-        print( 'Getting recs' )
-        rec_refs = get_recommendations( model, abstract, USE_DBLP_IDS )
+        rec_refs = None
+        # NOTE: If just testing the Doc2Vec model, use this:
+        if not FULL_SIM:
+            rec_refs = d2ve_get_recommendations( model, abstract, USE_DBLP_IDS )
+        # NOTE: For testing Doc2Vec + AII:
+        else:
+            keywords_scores = test_papers['KEYWORDS'][i].split(';')
+            del keywords_scores[-1]
+            rec_refs = serv_get_recommendations( abstract, keywords_scores, model, keywords_docsrels, authorities )
 
         act_refs = test_papers['REF_ID'][i]
         if ';' in act_refs:
@@ -118,6 +130,7 @@ def test_model( model, test_papers ):
                 miss_total += rec_ref[1]
                 if rec_ref[1] > highest_miss:
                     highest_miss = rec_ref[1]
+        """
         print( 'hits = '+ str(hits) )
         if hits > 0:
             print( '  average hit = '+ str(hit_total/hits) )
@@ -126,22 +139,34 @@ def test_model( model, test_papers ):
         if misses > 0:
             print( '  average miss = '+ str(miss_total/misses) )
         print( '  highest miss = '+ str(highest_miss) )
-        
+        """
 
+    print( 'hits = '+ str(hits) )
+    if hits > 0:
+        print( '  average hit = '+ str(hit_total/hits) )
+    print( '  lowest hit  = '+ str(lowest_hit) )
+    print( 'misses = '+ str(misses) )
+    if misses > 0:
+        print( '  average miss = '+ str(miss_total/misses) )
+    print( '  highest miss = '+ str(highest_miss) )
     accuracy = hits / (hits + misses)
     print( "ACCURACY = "+ str(accuracy) )
 
     # TODO: Output for Xavier: doc_id, list of recs
 
-def test_models( models_files ):
+def test_models( FULL_SIM, models_files ):
     test_papers = pd.read_csv( TEST_FILEPATH )
+
+    # NOTE: Only need for testing with AII:
+    keywords_docsrels = populate_iks_dict()
+    authorities = initialize_authorities()
 
     for mod_f in models_files:
         print( 'Testing '+ mod_f )
         model = Doc2Vec.load( mod_f )
         print( 'Model loaded.' )
 
-        test_model( model, test_papers )
+        test_model( FULL_SIM, model, test_papers, keywords_docsrels, authorities )
 
 # TODO: Epochs was 12
 def train_test_and_save_doc2vec( docs, epochs=3, dm=1, dm_concat=1, size=400, window=5, negative=5, hs=0, min_count=2 ):
@@ -189,18 +214,26 @@ if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == 'USE_DBLP_IDS':
         USE_DBLP_IDS = True
 
+    FULL_SIM = False
+    if len(sys.argv) > 2 and sys.argv[2] == 'FULL_SIM':
+        FULL_SIM = True
+    print( 'FULL_SIM = '+ str(FULL_SIM) )
+
+    """
     tagmap0_models = ['models/tagmap0epochs12dm0dmc1size400win5neg5hs0minc2',
                       'models/tagmap0epochs12dm1dmc1size200win5neg5hs0minc2',
                       'models/tagmap0epochs12dm1dmc1size300win5neg5hs0minc2',
                       'models/tagmap0epochs12dm1dmc1size400win5neg5hs0minc2']
+    """
+    tagmap0_models = ['models/tagmap0epochs12dm0dmc1size400win5neg5hs0minc2']
     tagmap1_models = ['models/tagmap1epochs12dm0dmc1size400win5neg5hs0minc2',
                       'models/tagmap1epochs12dm1dmc1size200win5neg5hs0minc2',
                       'models/tagmap1epochs12dm1dmc1size300win5neg5hs0minc2',
                       'models/tagmap1epochs12dm1dmc1size400win5neg5hs0minc2']
     if not USE_DBLP_IDS:
-        test_models( tagmap1_models )
+        test_models( FULL_SIM, tagmap1_models )
     else:
-        test_models( tagmap0_models )
+        test_models( FULL_SIM, tagmap0_models )
     exit(0)  # TODO: Remove if doing training, too
 
     docs = get_docs()  # TODO: Update as necessary

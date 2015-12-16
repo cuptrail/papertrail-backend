@@ -50,6 +50,9 @@ def get_recommendations( model, abstract, USE_DBLP_IDS ):
         docs_scores = [ (tag_map[i], float(cossims[sim_ids[y]])) for y,i in enumerate(sim_ids) ]
     else:
         docs_scores = [ (i, float(cossims[sim_ids[y]])) for y,i in enumerate(sim_ids) ]
+
+    # TODO: Change me:
+    docs_scores = [ (x,y) for x,y in docs_scores if y >= 0.3 ]  # 0.415 seems to be middleground of avg hits/misses
     return docs_scores
 
 def get_recommendations_for_index( model, index ):

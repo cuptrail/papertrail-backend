@@ -17,21 +17,16 @@ DOC2VEC_MODEL_FILE = 'epochs1dm0dm_concat1size400window5negative5hs0min_count2' 
 
 USE_DBLP_IDS = True
 
-def initialize_models():
-    """ Initialize our trained models once, so they can be reused.
-    """
-    print( 'Initializing models' )
+# Initialize our trained models once, so they can be reused
+def initialize_d2v_model():
+    print( 'Initializing Doc2Vec model' )
     from gensim.models.doc2vec import Doc2Vec
     d2v_model = Doc2Vec.load( DOC2VEC_MODEL_FILE )
     d2v_model.train([])  # A work-around for https://github.com/piskvorky/gensim/issues/419
+    return d2v_model
 
-    if DOC2VEC_MODEL_FILE.startswith( 'tagmap1' ):
-        USE_DBLP_IDS = False
-    else:
-        USE_DBLP_IDS = True
-
-    keywords_docsrels = populate_iks_dict()
-
+def initialize_authorities():
+    print( 'Initializing authorities' )
     import csv
     csv.field_size_limit( 2**30 )  # NOTE: was sys.maxsize. Failed on my system, for some reason
     authorities = {}
@@ -39,8 +34,7 @@ def initialize_models():
         reader = csv.reader( auth_file, delimiter=',', quotechar='\"' )
         for row in reader:
             authorities[ row[0] ] = float( row[1] )
-
-    return d2v_model, keywords_docsrels, authorities
+    return authorities
 
 # Found on code.activstate.com/recipes/408859:
 def recv_timeout( sock ):
@@ -89,7 +83,6 @@ def serve( d2v_model, keywords_docsrels, authorities, papers ):
             print( 'Received: '+ data )
             abstract, keys_scores = parse_input(data)
             doc_ids = compute_recommendations( abstract, keys_scores, d2v_model, keywords_docsrels, authorities )
-            print( 'DEBUG: rec doc ids = '+ str(doc_ids) )
 
             response = papers_details( doc_ids, papers )
             response += '\n'   # NOTE: Apparently needed for Bluemix client code
@@ -114,7 +107,7 @@ def parse_input( string ):
     keywords_scores = []
     try:
         args = string.split('||')
-        abstract = args[0]  # TODO: CLEAN_TOKENIZE THIS!
+        abstract = args[0]
         keywords_scores = [ x.strip() for x in args[1].split(';') ]
     except:
         pass
@@ -126,32 +119,38 @@ def compute_recommendations( abstract, keywords_scores, d2v_model, keywords_docs
     """ Given an abstract and keywords+scores,
         output reference recommendations as a list of DBLP doc indices.
     """
-    print( 'DEBUG: USE_DBLP_IDS = ' + str(USE_DBLP_IDS) )
-
+    # TODO: Set d2v cutoff around 0.415 ? (since avg miss seems ~0.41 and avg hit is ~0.42)
     d2v_docs_scores = d2v_get_recs( d2v_model, abstract, USE_DBLP_IDS )
     aii_docs_scores = aii_get_recs( keywords_docsrels, keywords_scores )
     docs_scores = {}
     for doc, score in d2v_docs_scores:
-        if doc not in docs_scores:
-            docs_scores[doc] = score
-        else:
-            docs_scores[doc] += score
+        docs_scores[doc] = score
     for doc, score in aii_docs_scores:
         if doc not in docs_scores:
             docs_scores[doc] = score
         else:
             docs_scores[doc] += score
 
+    # TODO: Get the references of the most like recommendations (currently obtained)?
+    #       i.e. look up the REF_ID for the higher-score recs (if their index exists in 'papers')
+    #       Maybe have the % of REF_IDs proportional to the score of the rec
+    #       And maybe have a minimum rec score for checking REF_IDs in the first place
+    #       i.e. 0.5 or higher gets 10% of REF_IDs (which ones?)
+    #            1.0 or higher gets 25%
+    #            ...
+    #            3.5 or higher gets 100%
+
     for doc in docs_scores:
         if doc in authorities:
             docs_scores[doc] += (100 * authorities[doc])
-    ds_list = sorted( docs_scores.iteritems(), key=lambda x:-x[1] )
+    #ds_list = sorted( docs_scores.iteritems(), key=lambda x:-x[1] )  # NOTE: iteritems() is for python 2!!
+    ds_list = sorted( docs_scores.items(), key=lambda x:-x[1] )
 
-    for doc, score in ds_list:
-        print( 'DEBUG: '+ str(doc) +' = '+ str(score) )
+    return ds_list  # TODO: DEBUG:  REMOVE THIS!
 
-    doc_ids = [ x[0] for x in ds_list ]
-    return doc_ids
+    # TODO: Uncomment these!:
+    #doc_ids = [ x[0] for x in ds_list ]
+    #return doc_ids
 
 def papers_details( doc_ids, papers ):
     """ Given a list of DBLP indices,
@@ -180,7 +179,14 @@ def load_papers():
     return pd.read_csv( 'data-kw.csv' )
 
 if __name__ == '__main__':
-    d2v_model, keywords_docsrels, authorities = initialize_models()
+    if DOC2VEC_MODEL_FILE.startswith( 'tagmap1' ):
+        USE_DBLP_IDS = False
+    else:
+        USE_DBLP_IDS = True
+
+    d2v_model = initialize_d2v_model()
+    keywords_docsrels = populate_iks_dict()
+    authorities = initialize_authorities()
     papers = load_papers()
 
     serve( d2v_model, keywords_docsrels, authorities, papers )
