@@ -10,8 +10,8 @@ PORT = 6969  # 63696 for laptop; 6969, 36969, or 63969 for desktop  # TODO: Chan
 
 # NOTE: The tagmap0 runs into the error during _pickle.loads(f.read()):
 #       AttributeError: 'module' object has no attribute 'defaultdict'
-#DOC2VEC_MODEL_FILE = 'tagmap0epochs12dm0dmc1size400win5neg5hs0minc2'   # TODO: Set filepath
-DOC2VEC_MODEL_FILE = 'epochs1dm0dm_concat1size400window5negative5hs0min_count2'   # TODO: Set filepath
+DOC2VEC_MODEL_FILE = 'tagmap0epochs12dm0dmc1size400win5neg5hs0minc2'   # TODO: Set filepath
+#DOC2VEC_MODEL_FILE = 'epochs1dm0dm_concat1size400window5negative5hs0min_count2'   # TODO: Set filepath
 
 # "Cached"  NOTE: Doesn't seem to work... what are we missing?
 #d2v_model = None
@@ -87,9 +87,13 @@ def serve( d2v_model, keywords_docsrels, authorities, papers ):
             abstract, keys_scores = parse_input(data)
             doc_ids = compute_recommendations( abstract, keys_scores, d2v_model, keywords_docsrels, authorities )
 
-            response = papers_details( doc_ids, papers )
-            response += '\n'   # NOTE: Apparently needed for Bluemix client code
+            # NOTE: When we handled one rec per line:
+            #recs_info = papers_details( doc_ids, papers )
+            #for rec in recs_info:
 
+            response = papers_details( doc_ids, papers )
+            response = json.dumps( response )
+            response += '\n'   # NOTE: Apparently needed for Bluemix client code
             print( 'Sending: '+ response )
             try:
                 clientsocket.send( response )  # NOTE: Use .encode() if python3
@@ -134,6 +138,7 @@ def compute_recommendations( abstract, keywords_scores, d2v_model, keywords_docs
     for doc, score in d2v_docs_scores:
         docs_scores[doc] = score
     for doc, score in aii_docs_scores:
+        doc = int(doc)
         if doc not in docs_scores:
             docs_scores[doc] = score
         else:
@@ -149,26 +154,23 @@ def compute_recommendations( abstract, keywords_scores, d2v_model, keywords_docs
     #            3.5 or higher gets 100%
 
     # TODO: Adjust this as necessary.
-    """
     for doc in docs_scores:
         if doc in authorities:
             docs_scores[doc] += (100 * authorities[doc])
-    """
     ds_list = sorted( docs_scores.iteritems(), key=lambda x:-x[1] )  # NOTE: iteritems() is for python 2!!
     #ds_list = sorted( docs_scores.items(), key=lambda x:-x[1] )
 
     doc_ids = [ x[0] for x in ds_list if x[1] > 0.3 ]
-    return doc_ids[:20]
+    return doc_ids[:12]
     #return ds_list  # NOTE: This is for doc2vec_trail
 
 def papers_details( doc_ids, papers ):
     """ Given a list of DBLP indices,
         return a JSON string containing their: titles, abstracts, authors, years.
     """
-    full_json = []
+    recs = []
     for pid in doc_ids:
         jso = {}
-        pid = int(pid)  # TODO: Maybe have all DBLP ids as ints to begin with (in initialization)?
         try:
             title = list( papers[papers['INDEX'] == pid]['TITLE'] )[0]
             authors = list( papers[papers['INDEX'] == pid]['AUTHORS'] )[0]
@@ -178,10 +180,11 @@ def papers_details( doc_ids, papers ):
             jso['authors'] = authors
             jso['summary'] = summary.replace('\n', ' ')
             jso['year'] = str(year)
-            full_json.append( jso )
+            recs.append( jso )
         except:  # Probably an IndexError (which happens when 'pid' not in DB), but cover our bases
             pass
-    return json.dumps( full_json )
+    #return json.dumps( recs )
+    return recs  # NOTE: Not actually JSON; it's a list of dicts
 
 def load_papers():
     import pandas as pd

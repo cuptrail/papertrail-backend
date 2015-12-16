@@ -22,33 +22,6 @@ def populate_iks_dict():
             keywords_docsrels[ row[0] ] = dr_tupes
     return keywords_docsrels
 
-"""
-def get_relevance2( keywords ):
-    # NOTE: What if we see a keyword (in 'keywords') that isn't in the dict?
-    # We ignore it. (For now, at least.)
-    all_scores = {}
-    for keyword in keywords:
-        if keyword in keywords_docsrels:
-            all_scores[ keyword ] = keywords_docsrels[ keyword ]
-    return all_scores
-
-# For a list of keywords, returns a dict with keyword as key and list of doc:relevance_score values
-def get_relevance(keywords):
-    counter = 0
-    all_scores = {}
-    with open('keywordscores.csv', 'r') as data:
-        reader = csv.reader(data, delimiter=',', quotechar='\"')
-        for row in reader:
-            kw = row[0]
-            if kw in keywords:
-                counter += 1
-                scores = row[1].split(';')
-                del scores[-1]
-                all_scores[kw] = scores
-                if counter == len(keywords):
-                    break
-    return all_scores
-"""
 
 def get_scores( keywords_docsrels, keywords, authorities ):
     # NOTE: What if we see a keyword (in 'keywords') that isn't in the dict?
@@ -62,19 +35,21 @@ def get_scores( keywords_docsrels, keywords, authorities ):
                 doc = entry[0]
                 score = entry[1]
                 if doc not in docs:             # TODO: Test different values
-                    docs[doc] = score           # e.g. (score * 0.2)
+                    docs[doc] = (score * 0.2)   # e.g. (score * 0.2)
                 else:
-                    docs[doc] += score
+                    docs[doc] += (score * 0.2)
     # TODO: Adjust this as necessary
     # Add authority score to doc entries, remove docs with 0 authority
+    """
     for doc in docs.keys():
         try:
             authority = authorities[doc]
             docs[doc] = docs[doc] + (100 * authority)
         except KeyError:
             del docs[doc]
+    """
     # Sort and return top X
-    return sorted( docs.iteritems(), key=lambda x:-x[1] )[:20]  # NOTE: iteritems() is for Python 2!!
+    return sorted( docs.iteritems(), key=lambda x:-x[1] )[:6]  # NOTE: iteritems() is for Python 2!!
     #return sorted( docs.items(), key=lambda x:-x[1] )[:7]
 
 
