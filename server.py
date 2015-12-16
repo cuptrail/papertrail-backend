@@ -6,8 +6,11 @@ import socket
 import time
 
 HOST = ''
-PORT = 6969  # 63696 for laptop; 6969, 36969, or 63969 for desktop
+PORT = 6969  # 63696 for laptop; 6969, 36969, or 63969 for desktop  # TODO: Change as necessary
 
+# NOTE: The tagmap0 runs into the error during _pickle.loads(f.read()):
+#       AttributeError: 'module' object has no attribute 'defaultdict'
+#DOC2VEC_MODEL_FILE = 'tagmap0epochs12dm0dmc1size400win5neg5hs0minc2'   # TODO: Set filepath
 DOC2VEC_MODEL_FILE = 'epochs1dm0dm_concat1size400window5negative5hs0min_count2'   # TODO: Set filepath
 
 # "Cached"  NOTE: Doesn't seem to work... what are we missing?
@@ -108,7 +111,12 @@ def parse_input( string ):
     try:
         args = string.split('||')
         abstract = args[0]
-        keywords_scores = [ x.strip() for x in args[1].split(';') ]
+        keysscores = args[1].strip()
+        print( 'DEBUG: keyscores = '+ str(keysscores) )
+        if keysscores[-1] == ';':
+            keysscores = keysscores[:-1]
+        keywords_scores = [ x.strip() for x in keysscores.split(';') ]  # was args[1].split(';')
+        print( 'DEBUG: keywords_scores = '+ str(keywords_scores) )
     except:
         pass
     print( '- abstract = '+ abstract )
@@ -121,7 +129,7 @@ def compute_recommendations( abstract, keywords_scores, d2v_model, keywords_docs
     """
     # TODO: Set d2v cutoff around 0.415 ? (since avg miss seems ~0.41 and avg hit is ~0.42)
     d2v_docs_scores = d2v_get_recs( d2v_model, abstract, USE_DBLP_IDS )
-    aii_docs_scores = aii_get_recs( keywords_docsrels, keywords_scores )
+    aii_docs_scores = aii_get_recs( keywords_docsrels, keywords_scores, authorities )
     docs_scores = {}
     for doc, score in d2v_docs_scores:
         docs_scores[doc] = score
@@ -140,17 +148,18 @@ def compute_recommendations( abstract, keywords_scores, d2v_model, keywords_docs
     #            ...
     #            3.5 or higher gets 100%
 
+    # TODO: Adjust this as necessary.
+    """
     for doc in docs_scores:
         if doc in authorities:
             docs_scores[doc] += (100 * authorities[doc])
-    #ds_list = sorted( docs_scores.iteritems(), key=lambda x:-x[1] )  # NOTE: iteritems() is for python 2!!
-    ds_list = sorted( docs_scores.items(), key=lambda x:-x[1] )
+    """
+    ds_list = sorted( docs_scores.iteritems(), key=lambda x:-x[1] )  # NOTE: iteritems() is for python 2!!
+    #ds_list = sorted( docs_scores.items(), key=lambda x:-x[1] )
 
-    return ds_list  # TODO: DEBUG:  REMOVE THIS!
-
-    # TODO: Uncomment these!:
-    #doc_ids = [ x[0] for x in ds_list ]
-    #return doc_ids
+    doc_ids = [ x[0] for x in ds_list if x[1] > 0.3 ]
+    return doc_ids[:20]
+    #return ds_list  # NOTE: This is for doc2vec_trail
 
 def papers_details( doc_ids, papers ):
     """ Given a list of DBLP indices,
@@ -167,7 +176,7 @@ def papers_details( doc_ids, papers ):
             year = list( papers[papers['INDEX'] == pid]['YEAR'] )[0]
             jso['title'] = title
             jso['authors'] = authors
-            jso['summary'] = summary
+            jso['summary'] = summary.replace('\n', ' ')
             jso['year'] = str(year)
             full_json.append( jso )
         except:  # Probably an IndexError (which happens when 'pid' not in DB), but cover our bases
@@ -179,7 +188,7 @@ def load_papers():
     return pd.read_csv( 'data-kw.csv' )
 
 if __name__ == '__main__':
-    if DOC2VEC_MODEL_FILE.startswith( 'tagmap1' ):
+    if 'tagmap1' in DOC2VEC_MODEL_FILE:
         USE_DBLP_IDS = False
     else:
         USE_DBLP_IDS = True
