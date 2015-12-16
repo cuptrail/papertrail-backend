@@ -1,5 +1,5 @@
 from algo_ii import populate_iks_dict
-from algo_ii import predict_citations as iks_get_recs  # for "inverted keyword-score"... 
+from algo_ii import predict_citations as aii_get_recs  # for "inverted keyword-score"... 
 from doc2vec_eval import get_recommendations as d2v_get_recs
 import json
 import socket
@@ -15,7 +15,7 @@ DOC2VEC_MODEL_FILE = 'epochs1dm0dm_concat1size400window5negative5hs0min_count2' 
 #authorities = {}
 #keywords_docsrels = {}
 
-USE_DBLP_IDS = False
+USE_DBLP_IDS = True
 
 def initialize_models():
     """ Initialize our trained models once, so they can be reused.
@@ -23,6 +23,7 @@ def initialize_models():
     print( 'Initializing models' )
     from gensim.models.doc2vec import Doc2Vec
     d2v_model = Doc2Vec.load( DOC2VEC_MODEL_FILE )
+    d2v_model.train([])  # A work-around for https://github.com/piskvorky/gensim/issues/419
 
     if DOC2VEC_MODEL_FILE.startswith( 'tagmap1' ):
         USE_DBLP_IDS = False
@@ -123,17 +124,33 @@ def parse_input( string ):
 
 def compute_recommendations( abstract, keywords_scores, d2v_model, keywords_docsrels, authorities ):
     """ Given an abstract and keywords+scores,
-        output reference recommendations as a string of comma-separated IDs (ints).
+        output reference recommendations as a list of DBLP doc indices.
     """
-	d2v_rec_doc_ids = d2v_get_recs( d2v_model, abstract, USE_DBLP_IDS )  # TODO: Enable this
+    print( 'DEBUG: USE_DBLP_IDS = ' + str(USE_DBLP_IDS) )
 
-    # TODO: The following function currently expects keywords+scores in a different format
-    #       so either change this call or change the function.
+    d2v_docs_scores = d2v_get_recs( d2v_model, abstract, USE_DBLP_IDS )
+    aii_docs_scores = aii_get_recs( keywords_docsrels, keywords_scores )
+    docs_scores = {}
+    for doc, score in d2v_docs_scores:
+        if doc not in docs_scores:
+            docs_scores[doc] = score
+        else:
+            docs_scores[doc] += score
+    for doc, score in aii_docs_scores:
+        if doc not in docs_scores:
+            docs_scores[doc] = score
+        else:
+            docs_scores[doc] += score
 
-    iks_rec_doc_ids = iks_get_recs( keywords_docsrels, keywords_scores, authorities )
+    for doc in docs_scores:
+        if doc in authorities:
+            docs_scores[doc] += (100 * authorities[doc])
+    ds_list = sorted( docs_scores.iteritems(), key=lambda x:-x[1] )
 
-    doc_ids = [ x[0] for x in iks_rec_doc_ids ]  # TODO: Replace this with permanent solution
+    for doc, score in ds_list:
+        print( 'DEBUG: '+ str(doc) +' = '+ str(score) )
 
+    doc_ids = [ x[0] for x in ds_list ]
     return doc_ids
 
 def papers_details( doc_ids, papers ):
@@ -144,15 +161,18 @@ def papers_details( doc_ids, papers ):
     for pid in doc_ids:
         jso = {}
         pid = int(pid)  # TODO: Maybe have all DBLP ids as ints to begin with (in initialization)?
-        title = list( papers[papers['INDEX'] == pid]['TITLE'] )[0]
-        authors = list( papers[papers['INDEX'] == pid]['AUTHORS'] )[0]
-        summary = list( papers[papers['INDEX'] == pid]['ABSTRACT'] )[0]
-        year = list( papers[papers['INDEX'] == pid]['YEAR'] )[0]
-        jso['title'] = title
-        jso['authors'] = authors
-        jso['summary'] = summary
-        jso['year'] = str(year)
-        full_json.append( jso )
+        try:
+            title = list( papers[papers['INDEX'] == pid]['TITLE'] )[0]
+            authors = list( papers[papers['INDEX'] == pid]['AUTHORS'] )[0]
+            summary = list( papers[papers['INDEX'] == pid]['ABSTRACT'] )[0]
+            year = list( papers[papers['INDEX'] == pid]['YEAR'] )[0]
+            jso['title'] = title
+            jso['authors'] = authors
+            jso['summary'] = summary
+            jso['year'] = str(year)
+            full_json.append( jso )
+        except:  # Probably an IndexError (which happens when 'pid' not in DB), but cover our bases
+            pass
     return json.dumps( full_json )
 
 def load_papers():

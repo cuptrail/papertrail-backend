@@ -1,8 +1,6 @@
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 #from nltk.tokenize import MWETokenizer
 
-# TODO: When checking user's input, (if necessary) see if the keywords are present in the model vocab or not
-
 #from doc2vec_train import clean_tokenize
 
 # To be used? See doc2vec_train.py for how they're created/used
@@ -44,8 +42,8 @@ def get_recommendations( model, abstract, USE_DBLP_IDS ):
     # Code you'll find on nycdatascience.com:
     cossims = list( map( lambda v: cossim(vec, v), model.docvecs ) )
     sim_ids = argmaxn( cossims, most_sim )
-    for i in range(most_sim):
-        print( sim_ids[i], cossims[sim_ids[i]] )
+    #for i in range(most_sim):
+    #    print( sim_ids[i], cossims[sim_ids[i]] )
 
     docs_scores = None
     if not USE_DBLP_IDS:

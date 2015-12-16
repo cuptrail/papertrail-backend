@@ -50,7 +50,7 @@ def get_relevance(keywords):
     return all_scores
 """
 
-def get_scores( keywords_docsrels, keywords, authorities):
+def get_scores( keywords_docsrels, keywords ):
     # NOTE: What if we see a keyword (in 'keywords') that isn't in the dict?
     # We ignore it. (For now, at least.)
     docs = {}
@@ -65,6 +65,7 @@ def get_scores( keywords_docsrels, keywords, authorities):
                     docs[doc] = score
                 else:
                     docs[doc] += score
+	"""
     # Add authority score to doc entries, remove docs with 0 authority
     for doc in docs.keys():
         try:
@@ -72,11 +73,12 @@ def get_scores( keywords_docsrels, keywords, authorities):
             docs[doc] = docs[doc] + (100 * authority)
         except KeyError:
             del docs[doc]
+	"""
     # Sort and return top 20
     return sorted( docs.iteritems(), key=lambda x:-x[1] )[:20]
 
 
-def predict_citations( keywords_docsrels, candidates, authorities ):
+def predict_citations( keywords_docsrels, candidates ):
     # TODO: Do we make sure all keywords are lower-cased and trimmed and such ??
     keywords = []
     for candidate in candidates:
@@ -93,8 +95,7 @@ def predict_citations( keywords_docsrels, candidates, authorities ):
             break
         keywords.append(keyword)
     # list of top k recommended documents and a score
-    scores = get_scores( keywords_docsrels, keywords, authorities)
-    return scores
+    return get_scores( keywords_docsrels, keywords )
 
 if __name__ == '__main__':
     pass
