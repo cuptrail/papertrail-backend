@@ -15,12 +15,19 @@ DOC2VEC_MODEL_FILE = 'epochs1dm0dm_concat1size400window5negative5hs0min_count2' 
 #authorities = {}
 #keywords_docsrels = {}
 
+USE_DBLP_IDS = False
+
 def initialize_models():
     """ Initialize our trained models once, so they can be reused.
     """
     print( 'Initializing models' )
     from gensim.models.doc2vec import Doc2Vec
     d2v_model = Doc2Vec.load( DOC2VEC_MODEL_FILE )
+
+    if DOC2VEC_MODEL_FILE.startswith( 'tagmap1' ):
+        USE_DBLP_IDS = False
+    else:
+        USE_DBLP_IDS = True
 
     keywords_docsrels = populate_iks_dict()
 
@@ -34,8 +41,10 @@ def initialize_models():
 
     return d2v_model, keywords_docsrels, authorities
 
-# Found online:
+# Found on code.activstate.com/recipes/408859:
 def recv_timeout( sock ):
+    """ Get the full message sent by the client, returned as one string.
+    """
     sock.set_blocking( 0 )
     all_data = []; data = ''; begin = time.time()
     while True:
@@ -116,7 +125,7 @@ def compute_recommendations( abstract, keywords_scores, d2v_model, keywords_docs
     """ Given an abstract and keywords+scores,
         output reference recommendations as a string of comma-separated IDs (ints).
     """
-	#d2v_rec_doc_ids = d2v_get_recs( d2v_model, abstract )  # TODO: Enable this
+	d2v_rec_doc_ids = d2v_get_recs( d2v_model, abstract, USE_DBLP_IDS )  # TODO: Enable this
 
     # TODO: The following function currently expects keywords+scores in a different format
     #       so either change this call or change the function.
@@ -126,9 +135,6 @@ def compute_recommendations( abstract, keywords_scores, d2v_model, keywords_docs
     doc_ids = [ x[0] for x in iks_rec_doc_ids ]  # TODO: Replace this with permanent solution
 
     return doc_ids
-
-    # TODO: Finish this. Decide how we want to have an integrated solution
-    #       Trivial solution: weights doc_ids higher that are obtained from both D2V and IKS
 
 def papers_details( doc_ids, papers ):
     """ Given a list of DBLP indices,
