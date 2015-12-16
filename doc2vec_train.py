@@ -1,9 +1,11 @@
 # TODO: Test python3 vs. python2 unicode ! Hopefully trained models aren't affected......................
 
+from doc2vec_eval import get_recommendations
 import datetime
 #from random import shuffle
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 #from nltk.tokenize import MWETokenizer
+import pandas as pd
 from random import shuffle
 from multiprocessing import cpu_count
 cores = cpu_count()
@@ -22,6 +24,10 @@ if not USE_DBLP_IDS:
     tag_map = []
     arXiv_start = 0
 
+# TODO: Update as necessary
+DBLP_TRAINING = 'data-kw-training.csv'
+TEST_FILEPATH = 'data-kw-test.csv'
+
 import re
 spltr = re.compile( r'\W+' )
 
@@ -30,9 +36,8 @@ def clean_tokenize( string ):
     """
     return [ w for w in spltr.split( string.lower() ) if w != '' ]
 
-def get_abstracts_indices_from_DBLP():
-    import pandas as pd
-    papers = pd.read_csv( 'data-kw.csv' )
+def get_abstracts_indices_from_DBLP( filepath ):
+    papers = pd.read_csv( filepath )
     for i, abstract in enumerate( papers['ABSTRACT'] ):
         index = papers['INDEX'][i]
         if isinstance( abstract, float ):
@@ -64,19 +69,10 @@ def get_abstracts_indices_from_arXiv():
     conn.close()
 
 
-def transform_DBLP_data():
-    """ Really only used for testing Bluemix... to save space
-    """
-    papers = pd.read_csv( 'data-kw.csv' )
-    with open( 'DBLP_ids_abstracts.txt', 'w' ) as f:
-        for i, abstract in enumerate( papers['ABSTRACT'] ):
-            index = papers['INDEX'][i]
-            f.write( str(index) + '|' + str(abstract) + '\n' )
-
 def get_docs():
     print( now() )
     print( 'Loading DBLP abstracts...' )
-    docs = list( get_abstracts_indices_from_DBLP() )
+    docs = list( get_abstracts_indices_from_DBLP(DBLP_TRAINING) )
     if USE_ARXIV:
         print( 'Loading arXiv abstracts...' )
         docs += list( get_abstracts_indices_from_arXiv() )
@@ -90,7 +86,65 @@ def get_paper_abstract( idx ):
     return ' '.join( docs[idx].words )
 
 
-def train_and_save_doc2vec( docs, epochs=12, dm=1, dm_concat=1, size=400, window=5, negative=5, hs=0, min_count=2 ):
+def test_model( model, test_papers ):
+    hits = 0
+    misses = 0
+
+    highest_miss = 0
+    miss_total = 0
+    lowest_hit = 1
+    hit_total = 0
+    for i, abstract in enumerate( test_papers['ABSTRACT'] ):
+        index = test_papers['INDEX'][i]
+
+        print( 'Getting recs' )
+        rec_refs = get_recommendations( model, abstract, USE_DBLP_IDS )
+
+        act_refs = test_papers['REF_ID'][i]
+        if ';' in act_refs:
+            act_refs = act_refs.split(';')
+        else:
+            act_refs = list( act_refs )
+        act_refs = list( map(int, act_refs) )
+
+        for rec_ref in rec_refs:
+            if rec_ref[0] in act_refs:
+                hits += 1
+                hit_total += rec_ref[1]
+                if rec_ref[1] < lowest_hit:
+                    lowest_hit = rec_ref[1]
+            else:
+                misses += 1
+                miss_total += rec_ref[1]
+                if rec_ref[1] > highest_miss:
+                    highest_miss = rec_ref[1]
+        print( 'hits = '+ str(hits) )
+        if hits > 0:
+            print( '  average hit = '+ str(hit_total/hits) )
+        print( '  lowest hit  = '+ str(lowest_hit) )
+        print( 'misses = '+ str(misses) )
+        if misses > 0:
+            print( '  average miss = '+ str(miss_total/misses) )
+        print( '  highest miss = '+ str(highest_miss) )
+        
+
+    accuracy = hits / (hits + misses)
+    print( "ACCURACY = "+ str(accuracy) )
+
+    # TODO: Output for Xavier: doc_id, list of recs
+
+def test_models( models_files ):
+    test_papers = pd.read_csv( TEST_FILEPATH )
+
+    for mod_f in models_files:
+        print( 'Testing '+ mod_f )
+        model = Doc2Vec.load( mod_f )
+        print( 'Model loaded.' )
+
+        test_model( model, test_papers )
+
+# TODO: Epochs was 12
+def train_test_and_save_doc2vec( docs, epochs=3, dm=1, dm_concat=1, size=400, window=5, negative=5, hs=0, min_count=2 ):
     alpha, min_alpha = (0.025, 0.001)
     alpha_delta = (alpha - min_alpha) / epochs
 
@@ -114,7 +168,8 @@ def train_and_save_doc2vec( docs, epochs=12, dm=1, dm_concat=1, size=400, window
         alpha -= alpha_delta
         print( 'Done training #{} at {}'.format( epoch, now() ) )
 
-    #return model
+    test_model( model )
+
     filepath = ''
     if USE_DBLP_IDS:
         filepath = 'tagmap0'
@@ -128,23 +183,39 @@ def train_and_save_doc2vec( docs, epochs=12, dm=1, dm_concat=1, size=400, window
 
 
 if __name__ == '__main__':
+    print( now() )
+
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == 'USE_DBLP_IDS':
         USE_DBLP_IDS = True
 
-    docs = get_docs()
+    tagmap0_models = ['models/tagmap0epochs12dm0dmc1size400win5neg5hs0minc2',
+                      'models/tagmap0epochs12dm1dmc1size200win5neg5hs0minc2',
+                      'models/tagmap0epochs12dm1dmc1size300win5neg5hs0minc2',
+                      'models/tagmap0epochs12dm1dmc1size400win5neg5hs0minc2']
+    tagmap1_models = ['models/tagmap1epochs12dm0dmc1size400win5neg5hs0minc2',
+                      'models/tagmap1epochs12dm1dmc1size200win5neg5hs0minc2',
+                      'models/tagmap1epochs12dm1dmc1size300win5neg5hs0minc2',
+                      'models/tagmap1epochs12dm1dmc1size400win5neg5hs0minc2']
+    if not USE_DBLP_IDS:
+        test_models( tagmap1_models )
+    else:
+        test_models( tagmap0_models )
+    exit(0)  # TODO: Remove if doing training, too
+
+    docs = get_docs()  # TODO: Update as necessary
     # TODO: Try setting different epochs for these models, amongst other changes
 
     # External test configurations:
     # PV-DM w/concatenation - window=5 (both sides) approximates paper's 10-word total window size
-    #train_and_save_doc2vec( docs, dm=1, dm_concat=1, size=400, window=5, negative=5, hs=0, min_count=2 )
+    train_test_and_save_doc2vec( docs, dm=1, dm_concat=1, size=400, window=5, negative=5, hs=0, min_count=2 )
     # PV-DBOW 
-    #train_and_save_doc2vec( docs, dm=0, size=400, negative=5, hs=0, min_count=2 )
+    train_test_and_save_doc2vec( docs, dm=0, size=400, negative=5, hs=0, min_count=2 )
     # PV-DM w/average
     # NOTE: This doesn't work?? because, evidently, 'dm_mean' is not an expected parameter?
-    #train_and_save_doc2vec( docs, dm=1, dm_mean=1, size=400, window=10, negative=5, hs=0, min_count=2 )
+    #train_test_and_save_doc2vec( docs, dm=1, dm_mean=1, size=400, window=10, negative=5, hs=0, min_count=2 )
     
     # Our test configurations:
-    #train_and_save_doc2vec( docs, size=200 )
-    #train_and_save_doc2vec( docs, size=300 )
-    train_and_save_doc2vec( docs, size=400 )
+    train_test_and_save_doc2vec( docs, size=200 )
+    train_test_and_save_doc2vec( docs, size=300 )
+    train_test_and_save_doc2vec( docs, size=400 )

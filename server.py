@@ -13,11 +13,18 @@ DOC2VEC_MODEL_FILE = 'epochs1dm0dm_concat1size400window5negative5hs0min_count2' 
 d2v_model = None
 authorities = {}
 
+USE_DBLP_IDS = False
+
 def initialize_models():
     """ Initialize our trained models once, so they can be reused.
     """
     from gensim.models.doc2vec import Doc2Vec
     d2v_model = Doc2Vec.load( DOC2VEC_MODEL_FILE )
+
+    if DOC2VEC_MODEL_FILE.startswith( 'tagmap1' ):
+        USE_DBLP_IDS = False
+    else:
+        USE_DBLP_IDS = True
 
     populate_iks_dict()
 
@@ -28,8 +35,10 @@ def initialize_models():
         for row in reader:
             authorities[ row[0] ] = float( row[1] )
 
-# Found online:
+# Found on code.activstate.com/recipes/408859:
 def recv_timeout( sock ):
+    """ Get the full message sent by the client, returned as one string.
+    """
     sock.set_blocking( 0 )
     all_data = []; data = ''; begin = time.time()
     while True:
@@ -112,11 +121,13 @@ def compute_recommendations( abstract, keywords_scores ):
     """ Given an abstract and keywords+scores,
         output reference recommendations as a string of comma-separated IDs (ints).
     """
-	#d2v_rec_doc_ids = d2v_get_recs( d2v_model, abstract )  # TODO: Enable this
+	d2v_rec_doc_ids = d2v_get_recs( d2v_model, abstract, USE_DBLP_IDS )  # TODO: Enable this
 
     # TODO: The following function currently expects keywords+scores in a different format
     #       so either change this call or change the function.
     iks_rec_doc_ids = iks_get_recs( keywords_scores, authorities )
+
+    shared_doc_ids = set( set(d2v_rec_doc_ids).intersect( set(iks_rec_doc_ids) ) )
 
     return iks_rec_doc_ids  # TODO: Replace this with permanent solution
 

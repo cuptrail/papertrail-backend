@@ -3,17 +3,25 @@ from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 
 # TODO: When checking user's input, (if necessary) see if the keywords are present in the model vocab or not
 
-from doc2vec_train import clean_tokenize
+#from doc2vec_train import clean_tokenize
 
 # To be used? See doc2vec_train.py for how they're created/used
 #tag_map
 #arXiv_start
 
+import re
+spltr = re.compile( r'\W+' )
+
+def clean_tokenize( string ):
+    """ Given a string, output a list of its tokens--lowercase--and excluding punctuation.
+    """
+    return [ w for w in spltr.split( string.lower() ) if w != '' ]
+
 from numpy import dot, sqrt, argmax
 
-# Code you'll find on nycdatascience.com:
+# Based on code found at nycdatascience.com:
 def cossim( v1, v2 ):
-    return dot(v1, v2) / sqrt( dot(v1, v1) ) / sqrt( dot(v2, v2) )
+    return dot(v1, v2) / sqrt( dot(v1, v1) * dot(v2, v2) )
 
 def argmaxn( l, n ):
     l_copy = list(l)
@@ -25,23 +33,26 @@ def argmaxn( l, n ):
     return args
 
 
-def get_recommendations( model, abstract ):
+def get_recommendations( model, abstract, USE_DBLP_IDS ):
+    """ Given a model and abstract (as a single string),
+        output a list of pairs: documents and their relevance scores
+        where the number of pairs is limited by the threshold and/or a constant.
+    """
     vec = model.infer_vector( clean_tokenize(abstract) )
 
     most_sim = 10
     # Code you'll find on nycdatascience.com:
     cossims = list( map( lambda v: cossim(vec, v), model.docvecs ) )
     sim_ids = argmaxn( cossims, most_sim )
-    #for i in range(most_sim):
-        #print( sim_ids[i], cossims[sim_ids[i]] )
+    for i in range(most_sim):
+        print( sim_ids[i], cossims[sim_ids[i]] )
 
-    # TODO: NOTE: We're assuming order doesn't matter for our recommendations. Change this?
-    doc_ids = None
+    docs_scores = None
     if not USE_DBLP_IDS:
-        doc_ids = [ tag_map[i] for i in sim_ids ]
+        docs_scores = [ (tag_map[i], float(cossims[sim_ids[y]])) for y,i in enumerate(sim_ids) ]
     else:
-        doc_ids = [ i for i in sim_ids ]
-    return doc_ids
+        docs_scores = [ (i, float(cossims[sim_ids[y]])) for y,i in enumerate(sim_ids) ]
+    return docs_scores
 
 def get_recommendations_for_index( model, index ):
     doc_ids = None
@@ -110,7 +121,6 @@ def get_recommendations( index ):
 """
 
 def _full_d2v_test():
-    # NOTE: For this to work, we need to train a model
     tot_matches = 0
     tot_nomatches = 0
     for test in range(1000):
