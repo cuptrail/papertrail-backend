@@ -8,15 +8,19 @@ csv.field_size_limit( 2**30 )   # was sys.maxsize
 # Threshold for relevance of keywords
 THRESHOLD = 0.6
 
-keywords_docsrels = {}
-
 def populate_iks_dict():
+    keywords_docsrels = {}
     with open( 'keywordscores.csv', 'r' ) as iks_file:
         reader = csv.reader( iks_file, delimiter=',', quotechar='\"' )
         for row in reader:
             docsrels = row[1].split(';')
             del docsrels[-1]
-            keywords_docsrels[ row[0] ] = docsrels
+            dr_tupes = []
+            for dr in docsrels:
+                d_r = dr.split(':')
+                dr_tupes.append( (d_r[0], float(d_r[1])) )
+            keywords_docsrels[ row[0] ] = dr_tupes
+    return keywords_docsrels
 
 """
 def get_relevance2( keywords ):
@@ -46,21 +50,21 @@ def get_relevance(keywords):
     return all_scores
 """
 
-def get_scores(keywords, authorities):
+def get_scores( keywords_docsrels, keywords, authorities):
     # NOTE: What if we see a keyword (in 'keywords') that isn't in the dict?
     # We ignore it. (For now, at least.)
     docs = {}
     # Add doc relevance scores to doc entries
     for keyword in keywords:
         if keyword in keywords_docsrels:
-            scores = keywords_docsrels[keyword]
-            for entry in scores:
-                doc = entry.split(':')[0]
-                score = entry.split(':')[1]
-                try:
-                    docs[doc] = docs[doc] + float(score)
-                except KeyError:
-                    docs[doc] = float(score)
+            docsrels = keywords_docsrels[keyword]
+            for entry in docsrels:
+                doc = entry[0]
+                score = entry[1]
+                if doc not in docs:
+                    docs[doc] = score
+                else:
+                    docs[doc] += score
     # Add authority score to doc entries, remove docs with 0 authority
     for doc in docs.keys():
         try:
@@ -69,15 +73,11 @@ def get_scores(keywords, authorities):
         except KeyError:
             del docs[doc]
     # Sort and return top 20
-    top = {}
-    for (key,value) in sorted(docs.iteritems(), key=lambda x:-x[1])[:20]:
-        top[key] = value
-    return top
+    return sorted( docs.iteritems(), key=lambda x:-x[1] )[:20]
 
 
-def predict_citations( candidates, authorities ):
+def predict_citations( keywords_docsrels, candidates, authorities ):
     # TODO: Do we make sure all keywords are lower-cased and trimmed and such ??
-
     keywords = []
     for candidate in candidates:
         # TODO: We should probably drop keywords that contain ':'
@@ -92,8 +92,8 @@ def predict_citations( candidates, authorities ):
         if relevance < THRESHOLD:
             break
         keywords.append(keyword)
-    # dictionary of top k recommended documents and a score
-    scores = get_scores(keywords, authorities)
+    # list of top k recommended documents and a score
+    scores = get_scores( keywords_docsrels, keywords, authorities)
     return scores
 
 if __name__ == '__main__':
